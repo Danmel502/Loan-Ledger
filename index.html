@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loan Ledger</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="loan.css" />
+</head>
+<body>
+  <!-- Banner shown until Firebase is configured -->
+  <div id="config-banner" class="config-banner" hidden>
+    <strong>Firebase isn't connected yet.</strong>
+    <span>Open <code>loan.js</code> and paste your project config into <code>firebaseConfig</code> to start saving loans.</span>
+  </div>
+
+  <div class="wrap">
+    <header class="masthead">
+      <div class="masthead__title">
+        <h1>Loan Ledger</h1>
+        <p>Track what you owe, and when it's due.</p>
+      </div>
+      <div class="summary" id="summary">
+        <div class="summary__item">
+          <span class="summary__label">Outstanding</span>
+          <span class="summary__value" id="stat-total">₱0</span>
+        </div>
+        <div class="summary__item">
+          <span class="summary__label">Open loans</span>
+          <span class="summary__value" id="stat-count">0</span>
+        </div>
+        <div class="summary__item">
+          <span class="summary__label">Next due</span>
+          <span class="summary__value" id="stat-next">—</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- Entry form -->
+      <section class="card form-card" aria-label="Add a loan">
+        <h2 class="card__title">Add a loan</h2>
+        <form id="loan-form" autocomplete="off">
+          <div class="field">
+            <label for="product">Product / service</label>
+            <input id="product" name="product" type="text" placeholder="e.g. Phone installment" required />
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="amount">Amount</label>
+              <div class="amount-input">
+                <span class="amount-input__symbol">₱</span>
+                <input id="amount" name="amount" type="number" min="0" step="0.01" placeholder="0.00" required />
+              </div>
+            </div>
+            <div class="field">
+              <label for="due">First due date</label>
+              <input id="due" name="due" type="date" required />
+            </div>
+          </div>
+
+          <div class="field-row field-row--app">
+            <div class="field">
+              <label for="app">From what app</label>
+              <div class="combo" id="app-combo">
+                <input id="app" name="app" type="text" placeholder="Pick or type a new app…" required
+                       role="combobox" aria-expanded="false" aria-controls="app-options" />
+                <button type="button" class="combo__toggle" id="app-toggle" aria-label="Show saved apps" tabindex="-1">▾</button>
+                <div class="combo__list" id="app-options" role="listbox" hidden></div>
+              </div>
+              <p class="field__hint">New apps are saved automatically and appear here next time.</p>
+            </div>
+            <div class="field">
+              <label for="months">Payment terms</label>
+              <select id="months" name="months">
+                <option value="1" selected>1 month</option>
+                <option value="2">2 months</option>
+                <option value="3">3 months</option>
+                <option value="4">4 months</option>
+                <option value="5">5 months</option>
+                <option value="6">6 months</option>
+                <option value="7">7 months</option>
+                <option value="8">8 months</option>
+                <option value="9">9 months</option>
+                <option value="10">10 months</option>
+                <option value="11">11 months</option>
+                <option value="12">12 months</option>
+              </select>
+            </div>
+          </div>
+          <p class="field__hint field__hint--terms" id="terms-hint" hidden>
+            The amount above is what you pay <strong>each month</strong> — one entry per month
+            will be added starting on the first due date.
+          </p>
+
+          <div class="field">
+            <label for="description">Description <span class="field__optional">(optional)</span></label>
+            <textarea id="description" name="description" rows="2" placeholder="What is this for?"></textarea>
+          </div>
+
+          <button type="submit" class="btn btn--primary" id="submit-btn">Add loan</button>
+        </form>
+      </section>
+
+      <!-- Calendar -->
+      <section class="card calendar-card" aria-label="Due-date calendar">
+        <div class="calendar__head">
+          <h2 class="card__title" id="cal-title">Month</h2>
+          <div class="calendar__nav">
+            <button class="btn btn--ghost" id="prev-month" aria-label="Previous month">‹</button>
+            <button class="btn btn--ghost" id="today-btn">Today</button>
+            <button class="btn btn--ghost" id="next-month" aria-label="Next month">›</button>
+          </div>
+        </div>
+
+        <div class="legend">
+          <span class="legend__item"><i class="dot dot--overdue"></i>Overdue</span>
+          <span class="legend__item"><i class="dot dot--soon"></i>Due within 7 days</span>
+          <span class="legend__item"><i class="dot dot--later"></i>Later</span>
+        </div>
+
+        <div class="calendar" role="grid" aria-label="Calendar">
+          <div class="calendar__weekdays">
+            <span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span><span>Mon</span>
+          </div>
+          <div class="calendar__days" id="calendar-days"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Breakdown panels -->
+    <section class="totals">
+      <div class="card">
+        <div class="card__title-row">
+          <h2 class="card__title">By pay week</h2>
+          <span class="card__sub">Tue → Mon · click a week for details</span>
+        </div>
+        <ul class="payweek-list" id="pay-weeks"></ul>
+      </div>
+      <div class="card">
+        <div class="card__title-row">
+          <h2 class="card__title">By app</h2>
+          <span class="card__sub" id="app-grand">₱0 total</span>
+        </div>
+        <ul class="appstat-list" id="by-app"></ul>
+      </div>
+    </section>
+  </div>
+
+  <!-- Datalist used by the edit fields inside the modal -->
+  <datalist id="app-list"></datalist>
+
+  <!-- Hover tooltip -->
+  <div id="tooltip" class="tooltip" hidden></div>
+
+  <!-- Detail modal (day / pay week / app) -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="modal-date">
+      <div class="modal__head">
+        <div>
+          <p class="modal__eyebrow" id="modal-eyebrow">Due on</p>
+          <h3 id="modal-date">—</h3>
+        </div>
+        <button class="btn btn--ghost modal__close" data-close aria-label="Close">✕</button>
+      </div>
+      <div class="modal__total">
+        <span>Total due</span>
+        <strong id="modal-total">₱0</strong>
+      </div>
+      <ul class="detail-list" id="detail-list"></ul>
+    </div>
+  </div>
+
+  <!-- Firebase (compat SDK — works from plain files, no build step) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="loan.js"></script>
+</body>
+</html>
